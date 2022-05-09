@@ -7,6 +7,19 @@ from html2text import html2text
 from pycnetTypes import Message, baseUrl, proxyUrl, CredsExpiredException, ValidationError
 
 
+def parseAttachments(attachments_html):
+    attachments = re.compile(r'(?<=\/a>); (?=<a)').split(attachments_html)
+    results = []
+    for attachment in attachments:
+        match = re.fullmatch(r'<a href=\\?"?(.*X-Amz-Signature=[0-9a-f]*)\\?\"?\s?target=\"?_blank\"?>(.*)<\/a>',attachment)
+        if match is not None:
+            results.append({
+                'filename': match.group(2),
+                'url': match.group(1)
+            })
+    return results
+
+
 class pycnet():
     @staticmethod
     def getMessages(cookies, options):
@@ -43,19 +56,19 @@ class pycnet():
         
         message_html_splitted = re.split(r'</?html[^>]*>', message_html)
         if len(message_html_splitted) != 5:
-            print(message_html_splitted)
-            print(len(message_html_splitted))
             raise ValidationError()
         formatted_message_html = f'<!--?xml encoding="UTF-8"--><html>{message_html_splitted[2]}</html>'
         formatted_message_html = re.sub(
             r'src="image.php\?',
             f'src="https://{proxyUrl}/image?s={cookies["PHPSESSID"]}&t={cookies["access_token"]}&',
             formatted_message_html)
+        attachments = parseAttachments(match2.group(1))
+        
         return {
             'html_content': formatted_message_html,
             'author': match1.group(1),
             'date': match1.group(2),
-            'attachments': match2.group(1),
+            'attachments': attachments,
             'subject': match3.group(1)
         }
 
